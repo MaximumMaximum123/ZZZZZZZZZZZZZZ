@@ -1,0 +1,39 @@
+# Gradle
+.gradle/
+build/
+out/
+*.iml
+
+# CMake / MSVC
+myau-natives/build/
+*.dir/
+*.vcxproj*
+*.sln
+CMakeCache.txt
+CMakeFiles/
+
+# Build output
+dist/
+
+# Development run directory -- holds accounts, saves and logs
+run/
+
+# IDE
+.idea/
+.vscode/
+
+# Java
+*.class
+hs_err_pid*
+replay_pid*
+.mtj.tmp/
+
+# Archives
+*.war
+*.nar
+*.ear
+*.tar.gz
+*.rar
+
+# Logs
+*.log
