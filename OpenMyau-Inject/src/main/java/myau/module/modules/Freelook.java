@@ -1,80 +1,53 @@
-package keystrokesmod.module.impl.render;
+package myau.module.modules;
 
-import keystrokesmod.mixin.impl.accessor.IAccessorMouseHelper;
-import keystrokesmod.module.Module;
-import keystrokesmod.module.ModuleManager;
-import keystrokesmod.module.impl.player.Freecam;
-import keystrokesmod.module.setting.impl.ButtonSetting;
-import keystrokesmod.module.setting.impl.KeySetting;
-import keystrokesmod.module.setting.impl.SliderSetting;
-import keystrokesmod.utility.Utils;
+import myau.event.EventTarget;
+import myau.event.types.EventType;
+import myau.event.types.Priority;
+import myau.events.TickEvent;
+import myau.module.Module;
+import myau.property.properties.BooleanProperty;
+import myau.property.properties.IntProperty;
+import myau.util.KeyBindUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
-import net.minecraftforge.client.event.GuiOpenEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent.RenderTickEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent.Phase;
-import net.minecraftforge.event.world.WorldEvent;
+import org.lwjgl.input.Keyboard;
+
+import java.util.Objects;
 
 public class Freelook extends Module {
+    private static final Minecraft mc = Minecraft.getMinecraft();
+    
     public static boolean perspectiveToggled;
     public static float cameraYaw;
     public static float cameraPitch;
 
-    private ButtonSetting hold;
-    private ButtonSetting invertPitch;
-    private ButtonSetting lockPitch;
-    private ButtonSetting customFov;
-    private SliderSetting fov;
-    private KeySetting freelookKey;
-
     private boolean prevKeyState;
     private int previousPerspective;
     private float lastFov;
+    
+    public final IntProperty freelookKey = new IntProperty("key", 56);
+    public final BooleanProperty hold = new BooleanProperty("hold", true);
+    public final BooleanProperty invertPitch = new BooleanProperty("invert-pitch", false);
+    public final BooleanProperty lockPitch = new BooleanProperty("lock-pitch", true);
+    public final BooleanProperty customFov = new BooleanProperty("custom-fov", false);
+    public final IntProperty fov = new IntProperty("fov", 90, 10, 150);
 
     public Freelook() {
-        super("Free Look", category.render);
-        this.registerSetting(freelookKey = new KeySetting("Key", 56));
-        this.registerSetting(hold = new ButtonSetting("Hold", true));
-        this.registerSetting(invertPitch = new ButtonSetting("Invert pitch", false));
-        this.registerSetting(lockPitch = new ButtonSetting("Lock pitch", true));
-        this.registerSetting(customFov = new ButtonSetting("Custom FOV", false));
-        this.registerSetting(fov = new SliderSetting("FOV", 90, 10, 150, 1));
+        super("Freelook", false);
     }
 
-    @Override
-    public void guiUpdate() {
-        fov.setVisible(customFov.isToggled(), this);
-    }
-
-    @SubscribeEvent
-    public void onRenderTick(RenderTickEvent e) {
-        if (e.phase != Phase.END || mc.currentScreen != null || !Utils.nullCheck()) {
-            return;
-        }
-        Module freecamMod = ModuleManager.getModule(Freecam.class);
-        if (freecamMod instanceof Freecam && ((Freecam) freecamMod).freeEntity != null) {
-            return;
-        }
-        boolean down = freelookKey.isPressed();
-        if (down != prevKeyState) {
-            onPressed(down);
-            prevKeyState = down;
-        }
-    }
-
-    @SubscribeEvent
-    public void onGuiOpen(GuiOpenEvent event) {
-        if (event.gui != null && perspectiveToggled && hold.isToggled()) {
-            resetPerspective();
-        }
-    }
-
-    @SubscribeEvent
-    public void onWorldLoad(WorldEvent.Load e) {
-        if (perspectiveToggled) {
-            resetPerspective();
+    @EventTarget(Priority.LOWEST)
+    public void onTick(TickEvent event) {
+        if (this.isEnabled() && event.getType() == EventType.PRE) {
+            if (mc.currentScreen != null) {
+                return;
+            }
+            
+            boolean down = Keyboard.isKeyDown(freelookKey.getValue());
+            if (down != prevKeyState) {
+                onPressed(down);
+                prevKeyState = down;
+            }
         }
     }
 
@@ -93,7 +66,7 @@ public class Freelook extends Module {
             } else {
                 enterPerspective();
             }
-        } else if (hold.isToggled()) {
+        } else if (hold.getValue()) {
             resetPerspective();
         }
     }
@@ -111,7 +84,7 @@ public class Freelook extends Module {
         if (mc.currentScreen == null && mc.inGameHasFocus) {
             mc.mouseHelper.grabMouseCursor();
         }
-        if (hold.isToggled() || mc.gameSettings.fovSetting == lastFov || customFov.isToggled()) {
+        if (hold.getValue() || mc.gameSettings.fovSetting == lastFov || customFov.getValue()) {
             mc.gameSettings.fovSetting = lastFov;
         }
     }
@@ -120,35 +93,37 @@ public class Freelook extends Module {
         if (!mc.inGameHasFocus) {
             return false;
         }
-        if (ModuleManager.freelook == null || !ModuleManager.freelook.isEnabled() || !perspectiveToggled) {
+        if (!perspectiveToggled) {
             return true;
         }
         mc.mouseHelper.mouseXYChange();
         float sens = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
         float mult = sens * sens * sens * 8.0f;
-        Freelook fl = ModuleManager.freelook;
-        if (fl != null) {
-            int dx = ((IAccessorMouseHelper) mc.mouseHelper).getDeltaX();
-            int dy = ((IAccessorMouseHelper) mc.mouseHelper).getDeltaY();
-            float fdx = dx * mult;
-            float fdy = dy * mult;
-            cameraYaw += fdx * 0.15f;
-            if (fl.invertPitch.isToggled()) {
-                fdy = -fdy;
-            }
-            cameraPitch += fdy * 0.15f;
-            if (fl.lockPitch.isToggled()) {
-                cameraPitch = Math.max(-90f, Math.min(90f, cameraPitch));
-            }
-            if (fl.customFov.isToggled()) {
-                mc.gameSettings.fovSetting = (float) fl.fov.getInput();
-            }
+        
+        int dx = Mouse.getDX();
+        int dy = Mouse.getDY();
+        float fdx = dx * mult;
+        float fdy = dy * mult;
+        cameraYaw += fdx * 0.15f;
+        if (getCameraModule() != null && getCameraModule().invertPitch.getValue()) {
+            fdy = -fdy;
+        }
+        cameraPitch += fdy * 0.15f;
+        if (getCameraModule() != null && getCameraModule().lockPitch.getValue()) {
+            cameraPitch = Math.max(-90f, Math.min(90f, cameraPitch));
+        }
+        if (getCameraModule() != null && getCameraModule().customFov.getValue()) {
+            mc.gameSettings.fovSetting = getCameraModule().fov.getValue();
         }
         return false;
     }
 
+    private static Freelook getCameraModule() {
+        return (Freelook) myau.Myau.moduleManager.getModule(Freelook.class);
+    }
+
     @Override
-    public void onDisable() {
+    public void onDisabled() {
         if (perspectiveToggled) {
             perspectiveToggled = false;
             applyThirdPersonView(0);
@@ -177,5 +152,10 @@ public class Freelook extends Module {
         if (mc.renderGlobal != null) {
             mc.renderGlobal.setDisplayListEntitiesDirty();
         }
+    }
+
+    @Override
+    public String[] getSuffix() {
+        return new String[]{freelookKey.getValue() == 0 ? "Unbound" : KeyBindUtil.getKeyName(freelookKey.getValue())};
     }
 }
