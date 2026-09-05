@@ -147,6 +147,8 @@ public class Myau {
         moduleManager.modules.put(ViewClip.class, new ViewClip());
         moduleManager.modules.put(Wtap.class, new Wtap());
         moduleManager.modules.put(Xray.class, new Xray());
+        moduleManager.modules.put(Eagle.class, new Eagle());
+        moduleManager.modules.put(Freelook.class, new Freelook());
         commandManager.commands.add(new BindCommand());
         commandManager.commands.add(new ConfigCommand());
         commandManager.commands.add(new DenickCommand());
